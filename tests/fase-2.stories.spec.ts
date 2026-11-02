@@ -8,6 +8,37 @@ const IMAGE_LARGE = "/home/jj/24hr-Story-Feature/image.png"; // 2272x3579 (>1080
 const RECENT_B64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 
+// Dispatch touchstart + touchend on an element to simulate a swipe, driving
+// the component's onTouchStart/onTouchEnd handlers.
+async function swipeOn(page: import("@playwright/test").Page, selector: string, startX: number, startY: number, endX: number, endY: number) {
+  await page.evaluate(
+    ({ sel, sx, sy, ex, ey }) => {
+      const el = document.querySelector(sel);
+      if (!el) return;
+      const startTouch = new Touch({ identifier: 0, target: el, clientX: sx, clientY: sy });
+      const endTouch = new Touch({ identifier: 0, target: el, clientX: ex, clientY: ey });
+
+      el.dispatchEvent(
+        new TouchEvent("touchstart", {
+          bubbles: true,
+          cancelable: true,
+          touches: [startTouch],
+          changedTouches: [startTouch],
+        })
+      );
+      el.dispatchEvent(
+        new TouchEvent("touchend", {
+          bubbles: true,
+          cancelable: true,
+          touches: [],
+          changedTouches: [endTouch],
+        })
+      );
+    },
+    { sel: selector, sx: startX, sy: startY, ex: endX, ey: endY }
+  );
+}
+
 async function seedStories(page: import("@playwright/test").Page, items: Array<{ id: string; base64: string; timestamp: number }>) {
   await page.goto("/");
   await page.waitForLoadState("domcontentloaded");
@@ -98,13 +129,11 @@ test("fase 2: Swipe left/right → cycle through stories", async ({ page }) => {
   const box = await viewer.boundingBox();
   expect(box).not.toBeNull();
 
-  // Swipe left → next story (start X high, end X low)
-  await page.touchscreen.touchstart(
-    box!.x + box!.width / 2,
-    box!.y + box!.height / 2
-  );
-  await page.touchscreen.touchmove(box!.x + 100, box!.y + box!.height / 2);
-  await page.touchscreen.touchend(box!.x + 100, box!.y + box!.height / 2);
+  const cx = box!.x + box!.width / 2;
+  const cy = box!.y + box!.height / 2;
+
+  // Swipe left → next story (start X high, end X low => dx < 0)
+  await swipeOn(page, '[data-testid="story-viewer-container"]', cx + 120, cy, cx - 120, cy);
   await page.waitForTimeout(1000);
 
   await page.screenshot({
@@ -112,16 +141,8 @@ test("fase 2: Swipe left/right → cycle through stories", async ({ page }) => {
     fullPage: true,
   });
 
-  // Swipe right → previous story (start X low, end X high)
-  await page.touchscreen.touchstart(box!.x + 100, box!.y + box!.height / 2);
-  await page.touchscreen.touchmove(
-    box!.x + box!.width / 2,
-    box!.y + box!.height / 2
-  );
-  await page.touchscreen.touchend(
-    box!.x + box!.width / 2,
-    box!.y + box!.height / 2
-  );
+  // Swipe right → previous story (start X low, end X high => dx > 0)
+  await swipeOn(page, '[data-testid="story-viewer-container"]', cx - 120, cy, cx + 120, cy);
   await page.waitForTimeout(1000);
 
   await page.screenshot({
