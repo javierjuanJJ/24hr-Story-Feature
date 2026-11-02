@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.local
+
+# Environment variables
+.env*
+
+# Story data (localStorage)
+@@storyImages
+
+# Vite temp files
+.vite/
