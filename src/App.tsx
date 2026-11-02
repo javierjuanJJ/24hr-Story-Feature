@@ -198,7 +198,7 @@ export default function App() {
                   background: "#000",
                 }}
               />
-            }}
+            )}
           >
             <Stories>
               {storyItems.map((item, idx) => (
