@@ -1,0 +1,173 @@
+.storyList {
+  padding: 12px;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  align-items: center;
+  background: #fafafa;
+  border-bottom: 1px solid #eee;
+  overflow-x: auto;
+  box-sizing: border-box;
+}
+.storyList::-webkit-scrollbar {
+  display: none;
+}
+.storyList {
+  scrollbar-width: none;
+}
+
+.emptyState {
+  text-align: center;
+  color: #666;
+  margin-top: 20px;
+}
+
+.storyCircle {
+  flex: 0 0 auto;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 3px solid transparent;
+  cursor: pointer;
+  box-sizing: border-box;
+  position: relative;
+  background: #fff;
+}
+.storyCircle img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.storyCircle.active {
+  border-color: #3366ff;
+}
+.storyCircleDelete {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15), 0 1px 2px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2;
+}
+.storyCircleDelete:active {
+  background: #f3f4f6;
+}
+.storyCircleDelete svg {
+  width: 14px;
+  height: 14px;
+  color: #b91c1c;
+}
+
+.uploadButton {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #3366ff;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  margin-left: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+.uploadButton:active {
+  background: #2555d9;
+}
+
+/* Full-screen story viewer overlay */
+.viewerOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  outline: none;
+}
+.viewerOverlay:focus {
+  outline: none;
+}
+.hidden {
+  display: none !important;
+}
+.viewerClose {
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  z-index: 60;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+.viewerClose:hover {
+  background: rgba(0, 0, 0, 0.75);
+}
+.viewerClose:active {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.viewerContainer {
+  width: 100%;
+  height: 100%;
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+  background: #000;
+}
+.viewerBackdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 55;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Responsive: tablet/mobile */
+@media (max-width: 640px) {
+  .storyList {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    justify-content: center;
+    padding: 8px;
+  }
+  .storyCircle {
+    width: 70px;
+    height: 70px;
+  }
+  .uploadButton {
+    width: 48px;
+    height: 48px;
+    margin-left: 4px;
+    margin-top: 4px;
+  }
+  .viewerClose {
+    top: 12px;
+    right: 12px;
+    width: 40px;
+    height: 40px;
+  }
+}

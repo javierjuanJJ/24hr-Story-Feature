@@ -10,6 +10,8 @@ import {
   useViewerContext,
 } from "@react-instastories/base";
 import "@react-instastories/base/index.css";
+import styles from "./App.css";
+import { CloseIcon, DeleteIcon, PlusIcon } from "@/icons";
 
 interface StoryItem {
   id: string;
@@ -110,11 +112,14 @@ export default function App() {
 
   const openViewer = useCallback((index: number) => {
     setActiveStoryIndex(index);
-    if (controlsRef.current) {
-      controlsRef.current.show(index);
-      controlsRef.current.open();
-    }
     setViewerOpen(true);
+    // Defer to allow the overlay to mount before driving the library viewer.
+    requestAnimationFrame(() => {
+      if (controlsRef.current) {
+        controlsRef.current.show(index);
+        controlsRef.current.open();
+      }
+    });
   }, []);
 
   const closeViewer = useCallback(() => {
@@ -180,6 +185,14 @@ export default function App() {
   // Remove story by id
   const removeStory = (id: string) => {
     setStoryItems((prev) => prev.filter((item) => item.id !== id));
+    // If the viewer was open on the removed story, close it
+    if (
+      viewerOpen &&
+      activeStoryIndex !== null &&
+      storyItems[activeStoryIndex]?.id === id
+    ) {
+      closeViewer();
+    }
   };
 
   // Swipe navigation state for the story list / viewer
@@ -245,16 +258,8 @@ export default function App() {
     >
       {/* Top: horizontal scrollable story thumbnails */}
       <div
-        style={{
-          padding: "12px",
-          display: "flex",
-          overflowX: "auto",
-          gap: "8px",
-          alignItems: "center",
-          justifyContent: "flex-start",
-          background: "#fafafa",
-          borderBottom: "1px solid #eee",
-        }}
+        data-testid="story-list"
+        className={styles.storyList}
       >
         {storyItems.map((item, idx) => (
           <div
@@ -263,17 +268,9 @@ export default function App() {
             onClick={() => openViewer(idx)}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
-            style={{
-              flex: "0 0 auto",
-              width: 80,
-              height: 80,
-              borderRadius: "50%",
-              overflow: "hidden",
-              border:
-                activeStoryIndex === idx ? "3px solid #3366ff" : "3px solid transparent",
-              cursor: "pointer",
-              boxSizing: "border-box",
-            }}
+            className={`${styles.storyCircle}${
+              activeStoryIndex === idx ? ` ${styles.active}` : ""
+            }`}
           >
             <img
               src={`data:image/jpeg;base64,${item.base64}`}
@@ -284,30 +281,27 @@ export default function App() {
                 objectFit: "cover",
               }}
             />
+            <button
+              data-testid={`delete-story-${idx}`}
+              aria-label="Delete story"
+              className={styles.storyCircleDelete}
+              onClick={(e) => {
+                e.stopPropagation();
+                removeStory(item.id);
+              }}
+            >
+              <DeleteIcon size={14} color="#b91c1c" />
+            </button>
           </div>
         ))}
         {/* Plus button to upload */}
         <button
           data-testid="upload-button"
+          aria-label="Upload story"
+          className={styles.uploadButton}
           onClick={() => fileRef.current?.click()}
-          style={{
-            flex: "0 0 auto",
-            width: 56,
-            height: 56,
-            borderRadius: "50%",
-            background: "#3366ff",
-            color: "#fff",
-            border: "none",
-            cursor: "pointer",
-            fontSize: "24px",
-            marginLeft: "8px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            boxSizing: "border-box",
-          }}
         >
-          +
+          <PlusIcon size={22} color="#fff" />
         </button>
       </div>
 
@@ -320,70 +314,85 @@ export default function App() {
         onChange={handleUpload}
       />
 
-      {/* Instastories full-screen viewer */}
-      <div style={{ padding: "12px" }}>
-        {hasStories ? (
+      {hasStories ? (
+        <>
+          {/* Full-screen story viewer overlay */}
           <div
-            data-testid="story-viewer-container"
-            onTouchStart={handleTouchStart}
-            onTouchEnd={handleTouchEnd}
-            style={{
-              width: "100%",
-              height: "40vh",
-              border: "2px solid #ddd",
-              overflow: "hidden",
-              position: "relative",
-              background: "#000",
-              borderRadius: "8px",
-            }}
+            data-testid="story-viewer-overlay"
+            className={`${styles.viewerOverlay} ${
+              viewerOpen ? "" : styles.hidden
+            }`}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Story viewer"
+            onClick={closeViewer}
           >
-            <InstaStories>
-              <StoryControls
-                onReady={(controls) => {
-                  controlsRef.current = controls;
-                }}
-              />
-              <Stories>
-                {storyItems.map((item, idx) => (
-                  <Story key={item.id} duration={3000}>
-                    <Preview>
-                      <img
-                        src={`data:image/jpeg;base64,${item.base64}`}
-                        alt=""
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "cover",
-                        }}
-                      />
-                    </Preview>
-                    <Pages>
-                      <Page>
+            <button
+              data-testid="viewer-close"
+              aria-label="Close viewer"
+              className={styles.viewerClose}
+              onClick={(e) => {
+                e.stopPropagation();
+                closeViewer();
+              }}
+            >
+              <CloseIcon size={24} color="#fff" />
+            </button>
+            <div
+              data-testid="story-viewer-container"
+              className={styles.viewerContainer}
+              onClick={(e) => e.stopPropagation()}
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
+            >
+              <InstaStories>
+                <StoryControls
+                  onReady={(controls) => {
+                    controlsRef.current = controls;
+                  }}
+                />
+                <Stories>
+                  {storyItems.map((item, idx) => (
+                    <Story key={item.id} duration={3000}>
+                      <Preview>
                         <img
                           src={`data:image/jpeg;base64,${item.base64}`}
                           alt=""
                           style={{
                             width: "100%",
                             height: "100%",
-                            objectFit: "contain",
+                            objectFit: "cover",
                           }}
                         />
-                      </Page>
-                    </Pages>
-                  </Story>
-                ))}
-              </Stories>
-            </InstaStories>
+                      </Preview>
+                      <Pages>
+                        <Page>
+                          <img
+                            src={`data:image/jpeg;base64,${item.base64}`}
+                            alt=""
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              objectFit: "contain",
+                            }}
+                          />
+                        </Page>
+                      </Pages>
+                    </Story>
+                  ))}
+                </Stories>
+              </InstaStories>
+            </div>
           </div>
-        ) : (
-          <p
-            data-testid="empty-state"
-            style={{ textAlign: "center", color: "#666", marginTop: "20px" }}
-          >
-            No stories yet. Upload an image to get started.
-          </p>
-        )}
-      </div>
+        </>
+      ) : (
+        <p
+          data-testid="empty-state"
+          className={styles.emptyState}
+        >
+          No stories yet. Upload an image to get started.
+        </p>
+      )}
     </div>
   );
 }
