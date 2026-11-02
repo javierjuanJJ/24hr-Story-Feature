@@ -1,4 +1,4 @@
-import React, { useEffect, useState, RefObject } from "react";
+import React, { useEffect, useRef, useState, RefObject } from "react";
 import {
   InstaStories,
   Stories,
