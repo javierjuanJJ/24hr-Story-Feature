@@ -10,7 +10,7 @@ import {
   useViewerContext,
 } from "@react-instastories/base";
 import "@react-instastories/base/index.css";
-import styles from "./App.css";
+import styles from "./App.module.css";
 import { CloseIcon, DeleteIcon, PlusIcon } from "@/icons";
 
 interface StoryItem {
