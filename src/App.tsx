@@ -29,6 +29,30 @@ const MAX_HEIGHT = 1920;
 const EXPIRY_MS = 86_400_000; // 24 hours
 const MAX_STORIES = 20;
 
+// Generate a unique id compatible with browsers that lack crypto.randomUUID.
+function generateId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  // Fallback: UUID v4 via crypto.getRandomValues (widely supported)
+  const buf = new Uint8Array(16);
+  try {
+    crypto.getRandomValues(buf);
+  } catch {
+    for (let i = 0; i < 16; i++) buf[i] = Math.floor(Math.random() * 256);
+  }
+  buf[6] = (buf[6] & 0x0f) | 0x40;
+  buf[8] = (buf[8] & 0x3f) | 0x80;
+  const hex = (b: number) => b.toString(16).padStart(2, "0");
+  return [
+    hex(buf[0]), hex(buf[1]), hex(buf[2]), hex(buf[3]),
+    "-", hex(buf[4]), hex(buf[5]), "-",
+    hex(buf[6]), hex(buf[7]), "-",
+    hex(buf[8]), hex(buf[9]), "-",
+    hex(buf[10]), hex(buf[11]), hex(buf[12]), hex(buf[13]), hex(buf[14]), hex(buf[15]),
+  ].join("");
+}
+
 // Internal controller that lives inside InstaStories so it can access the
 // library's stories/viewer contexts and expose navigation to the parent.
 function StoryControls({
@@ -136,7 +160,7 @@ export default function App() {
       const base64 = dataURL.split(",")[1];
 
       const newItem: StoryItem = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         base64,
         timestamp: Date.now(),
       };
