@@ -5,36 +5,32 @@ test.use({ storageState: { cookies: [], origins: [] } });
 const IMAGE_SMALL = "/home/jj/24hr-Story-Feature/image2.png"; // 500x636
 const IMAGE_LARGE = "/home/jj/24hr-Story-Feature/image.png"; // 2272x3579 (>1080x1920)
 
-test.beforeEach(async ({ page }) => {
-  // Start with a clean localStorage so expired/persisted stories don't leak
-  await page.addInitScript(() => {
+const RECENT_B64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+
+async function seedStories(page: import("@playwright/test").Page, items: Array<{ id: string; base64: string; timestamp: number }>) {
+  await page.goto("/");
+  await page.waitForLoadState("domcontentloaded");
+  await page.evaluate(({ items }) => {
     localStorage.clear();
-  });
-});
+    localStorage.setItem("@@storyImages", JSON.stringify(items));
+  }, { items });
+  await page.reload();
+  await page.waitForTimeout(1000);
+}
 
 test("fase 2: Load page → story circles displayed, no expired stories", async ({
   page,
 }) => {
-  // Seed localStorage with one recent and one expired story before load
   const now = Date.now();
-  await page.addInitScript((now) => {
-    const recent = {
-      id: "recent-1",
-      base64:
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
-      timestamp: now,
-    };
-    const expired = {
+  await seedStories(page, [
+    { id: "recent-1", base64: RECENT_B64, timestamp: now },
+    {
       id: "expired-1",
-      base64:
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+      base64: RECENT_B64,
       timestamp: now - 86_400_000 - 1000, // 24h + 1s ago
-    };
-    localStorage.setItem("@@storyImages", JSON.stringify([recent, expired]));
-  }, now);
-
-  await page.goto("/");
-  await page.waitForTimeout(1000);
+    },
+  ]);
 
   // Screenshot: initial load with stories (expired filtered out)
   await page.screenshot({
@@ -78,17 +74,11 @@ test("fase 2: Click + → select image → image appears in story list", async (
 });
 
 test("fase 2: Swipe left/right → cycle through stories", async ({ page }) => {
-  await page.goto("/");
-  await page.waitForTimeout(1000);
-
-  // Upload two images so we can cycle
-  await page.click('[data-testid="upload-button"]');
-  await page.setInputFiles('input[type="file"]', IMAGE_SMALL);
-  await page.waitForTimeout(1500);
-
-  await page.click('[data-testid="upload-button"]');
-  await page.setInputFiles('input[type="file"]', "/home/jj/24hr-Story-Feature/image3.png");
-  await page.waitForTimeout(1500);
+  const now = Date.now();
+  await seedStories(page, [
+    { id: "s-1", base64: RECENT_B64, timestamp: now },
+    { id: "s-2", base64: RECENT_B64, timestamp: now - 1000 },
+  ]);
 
   await expect(page.locator('[data-testid="story-circle-0"]')).toBeVisible();
   await expect(page.locator('[data-testid="story-circle-1"]')).toBeVisible();
@@ -109,7 +99,10 @@ test("fase 2: Swipe left/right → cycle through stories", async ({ page }) => {
   expect(box).not.toBeNull();
 
   // Swipe left → next story (start X high, end X low)
-  await page.touchscreen.touchstart(box!.x + box!.width / 2, box!.y + box!.height / 2);
+  await page.touchscreen.touchstart(
+    box!.x + box!.width / 2,
+    box!.y + box!.height / 2
+  );
   await page.touchscreen.touchmove(box!.x + 100, box!.y + box!.height / 2);
   await page.touchscreen.touchend(box!.x + 100, box!.y + box!.height / 2);
   await page.waitForTimeout(1000);
@@ -121,8 +114,14 @@ test("fase 2: Swipe left/right → cycle through stories", async ({ page }) => {
 
   // Swipe right → previous story (start X low, end X high)
   await page.touchscreen.touchstart(box!.x + 100, box!.y + box!.height / 2);
-  await page.touchscreen.touchmove(box!.x + box!.width / 2, box!.y + box!.height / 2);
-  await page.touchscreen.touchend(box!.x + box!.width / 2, box!.y + box!.height / 2);
+  await page.touchscreen.touchmove(
+    box!.x + box!.width / 2,
+    box!.y + box!.height / 2
+  );
+  await page.touchscreen.touchend(
+    box!.x + box!.width / 2,
+    box!.y + box!.height / 2
+  );
   await page.waitForTimeout(1000);
 
   await page.screenshot({
@@ -166,26 +165,14 @@ test("fase 2: Upload image > 1080×1920 → gets resized/constrained", async ({
 
 test("fase 2: 24h expired story removed from list", async ({ page }) => {
   const now = Date.now();
-
-  // Seed one recent + one expired story
-  await page.addInitScript((now) => {
-    const recent = {
-      id: "recent-1",
-      base64:
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
-      timestamp: now,
-    };
-    const expired = {
+  await seedStories(page, [
+    { id: "recent-1", base64: RECENT_B64, timestamp: now },
+    {
       id: "expired-1",
-      base64:
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+      base64: RECENT_B64,
       timestamp: now - 86_400_000 - 5000,
-    };
-    localStorage.setItem("@@storyImages", JSON.stringify([recent, expired]));
-  }, now);
-
-  await page.goto("/");
-  await page.waitForTimeout(1000);
+    },
+  ]);
 
   await page.screenshot({
     path: "tests/screenshots/fase-2/08-expired-removed.png",

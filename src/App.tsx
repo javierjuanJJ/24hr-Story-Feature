@@ -47,8 +47,22 @@ function StoryControls({
 }
 
 export default function App() {
-  // Load from localStorage on mount
-  const [storyItems, setStoryItems] = useState<StoryItem[]>([]);
+  // Initialize from localStorage on first render (lazy initializer) so the
+  // persistence effect never overwrites stored stories with an empty array.
+  const [storyItems, setStoryItems] = useState<StoryItem[]>(() => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      try {
+        const items: StoryItem[] = JSON.parse(stored);
+        const now = Date.now();
+        const valid = items.filter((item) => now - item.timestamp <= EXPIRY_MS);
+        return valid.slice(-MAX_STORIES);
+      } catch {
+        // Ignore malformed localStorage
+      }
+    }
+    return [];
+  });
   const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
 
@@ -59,23 +73,6 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(storyItems));
   }, [storyItems]);
-
-  // Initial load from localStorage + cleanup expired + keep last 20
-  useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        const items: StoryItem[] = JSON.parse(stored);
-        const now = Date.now();
-        const valid = items.filter((item) => now - item.timestamp <= EXPIRY_MS);
-        const limited = valid.slice(-MAX_STORIES);
-        setStoryItems(limited);
-      } catch {
-        // Ignore malformed localStorage
-        setStoryItems([]);
-      }
-    }
-  }, []);
 
   // Cleanup expired stories (run whenever items change)
   useEffect(() => {
