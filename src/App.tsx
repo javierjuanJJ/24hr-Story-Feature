@@ -185,7 +185,10 @@ export default function App() {
           <div
             key={item.id}
             data-testid={`story-circle-${idx}`}
-            onClick={() => openViewer(idx)}
+            onClick={(e) => {
+              e.stopPropagation();
+              openViewer(idx);
+            }}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
             className={`${styles.storyCircle}${activeStoryIndex === idx ? ` ${styles.active}` : ""}`}
@@ -212,19 +215,22 @@ export default function App() {
             aria-modal="true"
             aria-label="Story viewer"
           >
+            {/* Close button - top right */}
             <button data-testid="viewer-close" aria-label="Close viewer" className={styles.viewerClose} onClick={(e) => { e.stopPropagation(); closeViewer(); }}>
               <CloseIcon size={24} color="#fff" />
             </button>
 
+            {/* Left nav button */}
             <button data-testid="story-nav-viewer-left" aria-label="Previous story" className={styles.viewerNavButton} onClick={(e) => { e.stopPropagation(); if (activeStoryIndex !== null && activeStoryIndex > 0) setActiveStoryIndex((p) => p! - 1); }} disabled={activeStoryIndex === null || activeStoryIndex === 0}>
               <LeftIcon size={36} color="#fff" />
             </button>
 
+            {/* Right nav button */}
             <button data-testid="story-nav-viewer-right" aria-label="Next story" className={styles.viewerNavButton} onClick={(e) => { e.stopPropagation(); if (activeStoryIndex !== null && activeStoryIndex < storyItems.length - 1) setActiveStoryIndex((p) => p! + 1); }} disabled={activeStoryIndex === null || activeStoryIndex === storyItems.length - 1}>
               <RightIcon size={36} color="#fff" />
             </button>
 
-            {/* key forces InstaStories to remount when story index changes */}
+            {/* Story viewer - key forces remount when index changes */}
             <div key={`viewer-${activeStoryIndex}`} data-testid="story-viewer-container" className={styles.viewerContainer} onClick={(e) => e.stopPropagation()} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
               <InstaStories
                 config={{

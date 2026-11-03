@@ -27,7 +27,7 @@
   width: 80px;
   height: 80px;
   border-radius: 50%;
-  overflow: hidden;
+  overflow: visible;
   border: 3px solid transparent;
   cursor: pointer;
   box-sizing: border-box;
