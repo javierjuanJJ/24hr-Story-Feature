@@ -346,21 +346,20 @@ export default function App() {
               onTouchEnd={handleTouchEnd}
             >
               <InstaStories
-          config={{
-            animation: "fade",
-            duration: 3000,
-            preset: "default",
-            timer: {
-              shouldUseDefault: true,
-              interval: 3000,
-            },
-            viewer: {
-              shouldMount: true,
-              story: 0,
-            },
-          }}
-          style={{ width: "100%", height: "100%" }}
-        >
+                config={{
+                  animation: "fade",
+                  duration: 3000,
+                  preset: "default",
+                  timer: {
+                    shouldUseDefault: true,
+                    interval: 3000,
+                  },
+                  viewer: {
+                    shouldMount: true,
+                    story: 0,
+                  },
+                }}
+              >
                 <StoryControls
                   onReady={(controls) => {
                     controlsRef.current = controls;
