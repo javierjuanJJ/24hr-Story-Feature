@@ -11,11 +11,9 @@
         "playwright": {
             "type": "local",
             "command": [
-                "npx",
-                "-y",
-                "@playwright/mcp@latest",
-                "--browser",
-                "firefox"
+                "pnpm",
+                "dlx",
+                "@playwright/mcp@latest"
             ]
         }
     }

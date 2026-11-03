@@ -160,14 +160,12 @@ test.describe("fase 3: custom icons, full-screen viewer, responsive design, dele
   });
 
   test("Open full-screen viewer and close it", async ({ page }) => {
-    const now = Date.now();
-    await seedStories(page, [
-      { id: "v-1", base64: RECENT_B64, timestamp: now },
-      { id: "v-2", base64: RECENT_B64, timestamp: now - 1000 },
-    ]);
+    await page.goto("/");
+    await page.setInputFiles('input[type="file"]', IMAGE_SMALL);
+    await expect(page.locator('[data-testid="story-circle-0"]')).toBeVisible();
 
     await page.click('[data-testid="story-circle-0"]');
-    await page.waitForTimeout(1000);
+    await expect(page.locator(".instastories-viewer")).toBeVisible();
 
     await page.screenshot({
       path: "tests/screenshots/fase-3/06-viewer-open.png",
@@ -179,6 +177,27 @@ test.describe("fase 3: custom icons, full-screen viewer, responsive design, dele
 
     const container = page.locator('[data-testid="story-viewer-container"]');
     await expect(container).toBeVisible();
+
+    const storyImage = page.locator(".instastories-page img").first();
+    await expect.poll(() =>
+      storyImage.evaluate((image) => (image as HTMLImageElement).naturalWidth)
+    ).toBeGreaterThan(0);
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const overlay = document.querySelector(
+            '[data-testid="story-viewer-overlay"]'
+          );
+          const box = overlay?.getBoundingClientRect();
+          if (!box) return false;
+          const topElement = document.elementFromPoint(
+            box.left + box.width / 2,
+            box.top + box.height / 2
+          );
+          return topElement?.closest(".instastories-page") !== null;
+        })
+      )
+      .toBe(true);
 
     // Close button should be visible
     await expect(page.locator('[data-testid="viewer-close"]')).toBeVisible();
