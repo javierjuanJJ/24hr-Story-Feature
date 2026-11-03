@@ -67,6 +67,7 @@
   color: #b91c1c;
 }
 
+/* Upload button */
 .uploadButton {
   flex: 0 0 auto;
   width: 56px;
@@ -106,31 +107,8 @@
 .hidden {
   display: none !important;
 }
-.viewerClose {
-  position: absolute;
-  top: 20px;
-  right: 24px;
-  z-index: 60;
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.6);
-  border: none;
-  color: #fff;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-  pointer-events: auto;
-}
-.viewerClose:hover {
-  background: rgba(0, 0, 0, 0.8);
-}
-.viewerClose:active {
-  background: rgba(255, 255, 255, 0.15);
-}
 
+/* Viewer container */
 .viewerContainer {
   width: 100%;
   max-width: 1080px;
@@ -140,14 +118,73 @@
   overflow: hidden;
   background: #000;
   pointer-events: none;
+  margin: 0 auto;
 }
 
-.viewerBackdrop {
+/* Viewer navigation buttons - positioned on sides */
+.viewerNavButton {
   position: absolute;
-  inset: 0;
-  z-index: 55;
-  background: transparent;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  border: none;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  z-index: 60;
+  pointer-events: auto;
+  transition: background 0.2s ease;
+}
+.viewerNavButton:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+.viewerNavButton:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+.viewerNavButton:disabled:hover {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+/* Left nav button */
+.viewerNavButton[data-testid="story-nav-viewer-left"] {
+  left: 20px;
+}
+
+/* Right nav button */
+.viewerNavButton[data-testid="story-nav-viewer-right"] {
+  right: 20px;
+}
+
+/* Close button - top right */
+.viewerClose {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 70;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  transition: background 0.2s ease;
+}
+.viewerClose:hover {
+  background: rgba(0, 0, 0, 0.9);
+}
+.viewerClose:active {
+  background: rgba(255, 255, 255, 0.15);
 }
 
 /* Responsive: tablet/mobile */
@@ -168,10 +205,7 @@
     margin-left: 4px;
     margin-top: 4px;
   }
-  .viewerClose {
-    top: 12px;
-    right: 12px;
-    width: 40px;
-    height: 40px;
+  .storyNavButton {
+    display: none; /* Hide nav buttons on mobile */
   }
 }

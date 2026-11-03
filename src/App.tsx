@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Configurable,
   InstaStories,
   Stories,
   Story,
@@ -7,22 +8,21 @@ import {
   Pages,
   Preview,
   useStoriesContext,
-  useViewerContext,
 } from "@react-instastories/base";
 import "@react-instastories/base/index.css";
 import styles from "./App.module.css";
-import { CloseIcon, DeleteIcon, PlusIcon } from "@/icons";
+import {
+  CloseIcon,
+  DeleteIcon,
+  PlusIcon,
+  LeftIcon,
+  RightIcon,
+} from "@/icons";
 
 interface StoryItem {
   id: string;
   base64: string;
   timestamp: number;
-}
-
-interface ViewerControls {
-  show: (index: number) => void;
-  open: () => void;
-  close: () => void;
 }
 
 const STORAGE_KEY = "@@storyImages";
@@ -55,23 +55,6 @@ function generateId(): string {
   ].join("");
 }
 
-// Internal controller that lives inside InstaStories so it can access the
-// library's stories/viewer contexts and expose navigation to the parent.
-function StoryControls({
-  onReady,
-}: {
-  onReady: (controls: ViewerControls) => void;
-}): null {
-  const stories = useStoriesContext();
-  const viewer = useViewerContext();
-
-  useEffect(() => {
-    onReady({ show: stories.show, open: viewer.open, close: viewer.close });
-  }, [stories.show, viewer.open, viewer.close, onReady]);
-
-  return null;
-}
-
 export default function App() {
   // Initialize from localStorage on first render (lazy initializer) so the
   // persistence effect never overwrites stored stories with an empty array.
@@ -91,9 +74,7 @@ export default function App() {
   });
   const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
-
-  // Controls exposed by the internal StoryControls component
-  const controlsRef = useRef<ViewerControls | null>(null);
+  const [storyTimer, setStoryTimer] = useState<NodeJS.Timeout | null>(null);
 
   // Persist to localStorage whenever items change
   useEffect(() => {
@@ -110,25 +91,35 @@ export default function App() {
     }
   }, [storyItems]);
 
-  const openViewer = useCallback((index: number) => {
-    setActiveStoryIndex(index);
-    setViewerOpen(true);
-    // Defer to allow the overlay to mount before driving the library viewer.
-    requestAnimationFrame(() => {
-      if (controlsRef.current) {
-        controlsRef.current.show(index);
-        controlsRef.current.open();
-      }
-    });
-  }, []);
-
-  const closeViewer = useCallback(() => {
-    if (controlsRef.current) {
-      controlsRef.current.close();
+  // Story auto-advance timer: advance after 60 seconds in viewer
+  useEffect(() => {
+    // Clear any existing timer
+    if (storyTimer) {
+      clearTimeout(storyTimer);
+      setStoryTimer(null);
     }
-    setViewerOpen(false);
-    setActiveStoryIndex(null);
-  }, []);
+    // Start new timer when viewer opens with a story
+    if (viewerOpen && activeStoryIndex !== null && storyItems.length > 0) {
+      const newTimer = setTimeout(() => {
+        // Advance to next story or close if at the end
+        if (activeStoryIndex < storyItems.length - 1) {
+          setActiveStoryIndex((prev) => prev! + 1);
+        } else {
+          // At last story, close viewer and go to main screen
+          setViewerOpen(false);
+          setActiveStoryIndex(null);
+        }
+      }, 60_000); // 60 seconds
+      setStoryTimer(newTimer);
+    }
+    // Cleanup on component unmount
+    return () => {
+      if (storyTimer) {
+        clearTimeout(storyTimer);
+        setStoryTimer(null);
+      }
+    };
+  }, [viewerOpen, activeStoryIndex, storyItems.length]);
 
   // Handle file selection for upload
   const fileRef = useRef<HTMLInputElement>(null);
@@ -191,11 +182,12 @@ export default function App() {
       activeStoryIndex !== null &&
       storyItems[activeStoryIndex]?.id === id
     ) {
-      closeViewer();
+      setViewerOpen(false);
+      setActiveStoryIndex(null);
     }
   };
 
-  // Swipe navigation state for the story list / viewer
+  // Swipe navigation state for the viewer
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
 
@@ -219,28 +211,20 @@ export default function App() {
       if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
         if (dx > 0 && activeStoryIndex !== null && activeStoryIndex > 0) {
           // Swipe right → previous story
-          const next = activeStoryIndex - 1;
-          setActiveStoryIndex(next);
-          if (controlsRef.current && viewerOpen) {
-            controlsRef.current.show(next);
-          }
+          setActiveStoryIndex((prev) => prev! - 1);
         } else if (
           dx < 0 &&
           activeStoryIndex !== null &&
           activeStoryIndex < storyItems.length - 1
         ) {
           // Swipe left → next story
-          const next = activeStoryIndex + 1;
-          setActiveStoryIndex(next);
-          if (controlsRef.current && viewerOpen) {
-            controlsRef.current.show(next);
-          }
+          setActiveStoryIndex((prev) => prev! + 1);
         }
       }
       touchStartX.current = null;
       touchStartY.current = null;
     },
-    [activeStoryIndex, storyItems.length, viewerOpen]
+    [activeStoryIndex, storyItems.length]
   );
 
   const hasStories = storyItems.length > 0;
@@ -265,7 +249,10 @@ export default function App() {
           <div
             key={item.id}
             data-testid={`story-circle-${idx}`}
-            onClick={() => openViewer(idx)}
+            onClick={() => {
+              setActiveStoryIndex(idx);
+              setViewerOpen(true);
+            }}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
             className={`${styles.storyCircle}${
@@ -325,78 +312,117 @@ export default function App() {
             role="dialog"
             aria-modal="true"
             aria-label="Story viewer"
-            onClick={closeViewer}
           >
+            {/* Close button - top right */}
             <button
               data-testid="viewer-close"
               aria-label="Close viewer"
               className={styles.viewerClose}
               onClick={(e) => {
                 e.stopPropagation();
-                closeViewer();
+                setViewerOpen(false);
+                setActiveStoryIndex(null);
               }}
             >
               <CloseIcon size={24} color="#fff" />
             </button>
-            <div
-              data-testid="story-viewer-container"
-              className={styles.viewerContainer}
-              onClick={(e) => e.stopPropagation()}
-              onTouchStart={handleTouchStart}
-              onTouchEnd={handleTouchEnd}
+
+            {/* Story navigation arrows - left side */}
+            <button
+              data-testid="story-nav-viewer-left"
+              aria-label="Previous story"
+              className={styles.viewerNavButton}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (activeStoryIndex !== null && activeStoryIndex > 0) {
+                  setActiveStoryIndex((prev) => prev! - 1);
+                }
+              }}
+              disabled={activeStoryIndex === null || activeStoryIndex === 0}
             >
-              <InstaStories
-                config={{
-                  animation: "fade",
-                  duration: 3000,
-                  preset: "default",
-                  timer: {
-                    shouldUseDefault: true,
-                    interval: 3000,
-                  },
-                  viewer: {
-                    shouldMount: true,
-                    story: 0,
-                  },
-                }}
-              >
-                <StoryControls
-                  onReady={(controls) => {
-                    controlsRef.current = controls;
-                  }}
-                />
-                <Stories>
-                  {storyItems.map((item, idx) => (
-                    <Story key={item.id} duration={3000}>
-                      <Preview>
-                        <img
-                          src={`data:image/jpeg;base64,${item.base64}`}
-                          alt=""
-                          style={{
-                            width: "100%",
-                            height: "100%",
-                            objectFit: "cover",
-                          }}
-                        />
-                      </Preview>
-                      <Pages>
-                        <Page>
-                          <img
-                            src={`data:image/jpeg;base64,${item.base64}`}
-                            alt=""
-                            style={{
-                              width: "100%",
-                              height: "100%",
-                              objectFit: "contain",
-                            }}
-                          />
-                        </Page>
-                      </Pages>
-                    </Story>
-                  ))}
-                </Stories>
-              </InstaStories>
-            </div>
+              <LeftIcon size={36} color="#fff" />
+            </button>
+
+            {/* Story navigation arrows - right side */}
+            <button
+              data-testid="story-nav-viewer-right"
+              aria-label="Next story"
+              className={styles.viewerNavButton}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (
+                  activeStoryIndex !== null &&
+                  activeStoryIndex < storyItems.length - 1
+                ) {
+                  setActiveStoryIndex((prev) => prev! + 1);
+                }
+              }}
+              disabled={
+                activeStoryIndex === null ||
+                activeStoryIndex === storyItems.length - 1
+              }
+            >
+              <RightIcon size={36} color="#fff" />
+            </button>
+
+            <Configurable.Container>
+              <Configurable.Viewer>
+                <div
+                  data-testid="story-viewer-container"
+                  className={styles.viewerContainer}
+                  onClick={(e) => e.stopPropagation()}
+                  onTouchStart={handleTouchStart}
+                  onTouchEnd={handleTouchEnd}
+                >
+                  <InstaStories
+                    config={{
+                      animation: "fade",
+                      duration: 3000,
+                      preset: "default",
+                      timer: {
+                        shouldUseDefault: true,
+                        interval: 3000,
+                      },
+                      viewer: {
+                        shouldMount: true,
+                        story: activeStoryIndex ?? 0,
+                      },
+                    }}
+                  >
+                    <Stories>
+                      {storyItems.map((item, idx) => (
+                        <Story key={item.id} duration={3000}>
+                          <Preview>
+                            <img
+                              src={`data:image/jpeg;base64,${item.base64}`}
+                              alt=""
+                              style={{
+                                width: "100%",
+                                height: "100%",
+                                objectFit: "cover",
+                              }}
+                            />
+                          </Preview>
+                          <Pages>
+                            <Page>
+                              <img
+                                src={`data:image/jpeg;base64,${item.base64}`}
+                                alt=""
+                                style={{
+                                  width: "100%",
+                                  height: "100%",
+                                  objectFit: "contain",
+                                }}
+                              />
+                            </Page>
+                          </Pages>
+                        </Story>
+                      ))}
+                    </Stories>
+                  </InstaStories>
+                </div>
+              </Configurable.Viewer>
+            </Configurable.Container>
           </div>
         </>
       ) : (
