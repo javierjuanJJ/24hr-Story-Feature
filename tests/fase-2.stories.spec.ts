@@ -9,31 +9,24 @@ const RECENT_B64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 
 // Dispatch touchstart + touchend on an element to simulate a swipe, driving
-// the component's onTouchStart/onTouchEnd handlers.
+// the component's swipe handlers. Built from plain Events with touch-like
+// payloads because Firefox does not implement Touch/TouchEvent constructors.
 async function swipeOn(page: import("@playwright/test").Page, selector: string, startX: number, startY: number, endX: number, endY: number) {
   await page.evaluate(
     ({ sel, sx, sy, ex, ey }) => {
       const el = document.querySelector(sel);
       if (!el) return;
-      const startTouch = new Touch({ identifier: 0, target: el, clientX: sx, clientY: sy });
-      const endTouch = new Touch({ identifier: 0, target: el, clientX: ex, clientY: ey });
+      const dispatch = (type: string, touches: unknown[], changedTouches: unknown[]) => {
+        const event = new Event(type, { bubbles: true, cancelable: true });
+        Object.defineProperty(event, "touches", { value: touches });
+        Object.defineProperty(event, "changedTouches", { value: changedTouches });
+        el.dispatchEvent(event);
+      };
+      const start = { identifier: 0, target: el, clientX: sx, clientY: sy };
+      const end = { identifier: 0, target: el, clientX: ex, clientY: ey };
 
-      el.dispatchEvent(
-        new TouchEvent("touchstart", {
-          bubbles: true,
-          cancelable: true,
-          touches: [startTouch],
-          changedTouches: [startTouch],
-        })
-      );
-      el.dispatchEvent(
-        new TouchEvent("touchend", {
-          bubbles: true,
-          cancelable: true,
-          touches: [],
-          changedTouches: [endTouch],
-        })
-      );
+      dispatch("touchstart", [start], [start]);
+      dispatch("touchend", [], [end]);
     },
     { sel: selector, sx: startX, sy: startY, ex: endX, ey: endY }
   );
