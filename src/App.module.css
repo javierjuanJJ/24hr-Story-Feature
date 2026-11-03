@@ -41,6 +41,18 @@
 .storyCircle.active {
   border-color: #3366ff;
 }
+.storyCircle > img {
+  border-radius: 50%;
+  display: block;
+}
+
+/* The library preview toolbar duplicates our own thumbnail row, so it is
+   hidden. It stays in the DOM (just not painted) so the library can still
+   manage story state. Specificity/`!important` because the library styles it
+   with `.instastories-stories:not([data-preset])`. */
+:global(.instastories-stories):not([data-preset]) {
+  display: none !important;
+}
 
 .storyCircleDelete {
   position: absolute;
@@ -88,12 +100,13 @@
   background: #2555d9;
 }
 
-/* Full-screen story viewer overlay */
+/* Full-screen control layer over the library dialog (which is portaled to
+   document.body at z-index 10 and paints the dimmed background itself). */
 .viewerOverlay {
   position: fixed;
   inset: 0;
   z-index: 50;
-  background: #000;
+  background: transparent;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -108,17 +121,20 @@
   display: none !important;
 }
 
-/* Viewer container */
+/* Viewer container: full-viewport, transparent layer carrying the swipe
+   handlers' test target. It must never cover the story visually. */
 .viewerContainer {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  max-width: 1080px;
-  max-height: 1920px;
-  aspect-ratio: 9/16;
-  position: relative;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  aspect-ratio: auto;
   overflow: hidden;
-  background: #000;
+  background: transparent;
   pointer-events: none;
-  margin: 0 auto;
+  margin: 0;
 }
 
 /* Viewer navigation buttons - positioned on sides */
@@ -152,11 +168,13 @@
 }
 
 /* Left nav button */
+.viewerNavLeft,
 .viewerNavButton[data-testid="story-nav-viewer-left"] {
   left: 20px;
 }
 
 /* Right nav button */
+.viewerNavRight,
 .viewerNavButton[data-testid="story-nav-viewer-right"] {
   right: 20px;
 }

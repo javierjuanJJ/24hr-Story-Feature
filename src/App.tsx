@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   InstaStories,
   Stories,
@@ -6,6 +6,8 @@ import {
   Page,
   Pages,
   Preview,
+  useStoriesContext,
+  useViewerContext,
 } from "@react-instastories/base";
 import "@react-instastories/base/index.css";
 import styles from "./App.module.css";
@@ -23,11 +25,27 @@ interface StoryItem {
   timestamp: number;
 }
 
+/** Imperative handle exposed by <ViewerControls /> (context-based navigation). */
+interface ViewerControlsHandle {
+  show(index: number): void;
+  next(): void;
+  previous(): void;
+  open(): void;
+  close(): void;
+}
+
+/** Snapshot of the library viewer state reported up to <App />. */
+interface ViewerSnapshot {
+  open: boolean;
+  index: number;
+}
+
 const STORAGE_KEY = "@@storyImages";
 const MAX_WIDTH = 1080;
 const MAX_HEIGHT = 1920;
 const EXPIRY_MS = 86_400_000; // 24 hours
 const MAX_STORIES = 20;
+const AUTO_ADVANCE_MS = 60_000; // 60 seconds per story
 
 function generateId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -51,6 +69,65 @@ function generateId(): string {
   ].join("");
 }
 
+/**
+ * Rendered as the LAST child of <Stories> — the only place where both
+ * StoriesContext (show/next/previous) and ViewerContext (open/close) exist.
+ * Being last keeps every <Story> index stable (0..count-1); the library counts
+ * this element in `length`, so all bounds come from `count` instead.
+ *
+ * Also runs the 60s auto-advance timer (next story, or close at the end).
+ */
+function ViewerControls({
+  handleRef,
+  count,
+  onSnapshot,
+}: {
+  handleRef: React.RefObject<ViewerControlsHandle | null>;
+  count: number;
+  onSnapshot: (snapshot: ViewerSnapshot) => void;
+}) {
+  const stories = useStoriesContext();
+  const viewer = useViewerContext();
+
+  const mounted = viewer.mounted;
+  const current = stories.current;
+
+  // Refresh the imperative handle after every render so <App /> always calls
+  // the latest context functions.
+  useEffect(() => {
+    handleRef.current = {
+      show: (index: number) => stories.show(index),
+      next: () => stories.next(),
+      previous: () => stories.previous(),
+      open: () => viewer.open(),
+      close: () => viewer.close(),
+    };
+  });
+
+  useEffect(() => {
+    onSnapshot({ open: mounted, index: current });
+  }, [mounted, current, onSnapshot]);
+
+  // Latest values for the auto-advance timer (avoids restarting it on renders).
+  const actionRef = useRef({ current, next: stories.next, close: viewer.close });
+  useEffect(() => {
+    actionRef.current = { current, next: stories.next, close: viewer.close };
+  });
+
+  // 60s per story: advance to the next one, or close back to the main screen.
+  useEffect(() => {
+    if (!mounted || current < 0) return;
+    const timer = window.setTimeout(() => {
+      const action = actionRef.current;
+      if (action.current >= 0 && action.current < count - 1) action.next();
+      else action.close();
+    }, AUTO_ADVANCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [mounted, current, count]);
+
+  return null;
+}
+
 export default function App() {
   const [storyItems, setStoryItems] = useState<StoryItem[]>(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -66,9 +143,16 @@ export default function App() {
     }
     return [];
   });
-  const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
-  const [viewerOpen, setViewerOpen] = useState(false);
-  const [storyTimer, setStoryTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const [viewerState, setViewerState] = useState<ViewerSnapshot>({
+    open: false,
+    index: -1,
+  });
+
+  const handleSnapshot = useCallback((snapshot: ViewerSnapshot) => {
+    setViewerState(snapshot);
+  }, []);
+
+  const handleRef = useRef<ViewerControlsHandle | null>(null);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(storyItems));
@@ -115,67 +199,110 @@ export default function App() {
     img.src = blobUrl;
   };
 
+  const closeViewer = useCallback(() => {
+    handleRef.current?.close();
+  }, []);
+
   const removeStory = (id: string) => {
+    if (viewerState.open) closeViewer();
     setStoryItems((prev) => prev.filter((item) => item.id !== id));
-    if (viewerOpen && activeStoryIndex !== null && storyItems[activeStoryIndex]?.id === id) {
-      setViewerOpen(false);
-      setActiveStoryIndex(null);
-    }
   };
 
-  const touchStartX = useRef<number | null>(null);
-  const touchStartY = useRef<number | null>(null);
+  const openViewer = (index: number) => {
+    const handle = handleRef.current;
+    if (!handle || index < 0 || index >= storyItems.length) return;
+    handle.show(index);
+    handle.open();
+  };
 
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-    touchStartY.current = e.touches[0].clientY;
-  }, []);
+  const goNext = () => {
+    const { open, index } = viewerState;
+    if (!open || index < 0 || index >= storyItems.length - 1) return;
+    handleRef.current?.next();
+  };
 
-  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    if (touchStartX.current === null || touchStartY.current === null) return;
-    const endX = e.changedTouches[0].clientX;
-    const endY = e.changedTouches[0].clientY;
-    const dx = endX - touchStartX.current;
-    const dy = endY - touchStartY.current;
-    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
-      if (dx > 0 && activeStoryIndex !== null && activeStoryIndex > 0) {
-        setActiveStoryIndex((prev) => (prev !== null ? prev - 1 : 0));
-      } else if (dx < 0 && activeStoryIndex !== null && activeStoryIndex < storyItems.length - 1) {
-        setActiveStoryIndex((prev) => (prev !== null ? prev + 1 : 0));
-      }
-    }
-    touchStartX.current = null;
-    touchStartY.current = null;
-  }, [activeStoryIndex, storyItems.length]);
+  const goPrevious = () => {
+    const { open, index } = viewerState;
+    if (!open || index <= 0) return;
+    handleRef.current?.previous();
+  };
+
+  // Swipe navigation (works for touches on the dialog, which bubble to
+  // document, and for mouse drags on desktop).
+  const swipeRef = useRef({ goNext, goPrevious });
+  useEffect(() => {
+    swipeRef.current = { goNext, goPrevious };
+  });
+
+  useEffect(() => {
+    if (!viewerState.open) return;
+
+    const handleSwipe = (dx: number, dy: number) => {
+      if (Math.abs(dx) <= Math.abs(dy) || Math.abs(dx) <= 50) return;
+      if (dx < 0) swipeRef.current.goNext();
+      else swipeRef.current.goPrevious();
+    };
+
+    let touchX = 0;
+    let touchY = 0;
+    const onTouchStart = (event: TouchEvent) => {
+      const touch = event.touches[0];
+      if (!touch) return;
+      touchX = touch.clientX;
+      touchY = touch.clientY;
+    };
+    const onTouchEnd = (event: TouchEvent) => {
+      const touch = event.changedTouches[0];
+      if (!touch) return;
+      handleSwipe(touch.clientX - touchX, touch.clientY - touchY);
+    };
+
+    let mouseX = 0;
+    let mouseY = 0;
+    let mouseDown = false;
+    const onMouseDown = (event: MouseEvent) => {
+      mouseDown = true;
+      mouseX = event.clientX;
+      mouseY = event.clientY;
+    };
+    const onMouseUp = (event: MouseEvent) => {
+      if (!mouseDown) return;
+      mouseDown = false;
+      handleSwipe(event.clientX - mouseX, event.clientY - mouseY);
+    };
+
+    document.addEventListener("touchstart", onTouchStart, { passive: true });
+    document.addEventListener("touchend", onTouchEnd, { passive: true });
+    document.addEventListener("mousedown", onMouseDown);
+    document.addEventListener("mouseup", onMouseUp);
+    return () => {
+      document.removeEventListener("touchstart", onTouchStart);
+      document.removeEventListener("touchend", onTouchEnd);
+      document.removeEventListener("mousedown", onMouseDown);
+      document.removeEventListener("mouseup", onMouseUp);
+    };
+  }, [viewerState.open]);
+
+  // Kept in a stable object so <InstaStories /> does not reconfigure on
+  // every render. NOTE: no `preset` — the library styles every rule with
+  // `:not([data-preset])`, so setting one removes all styling.
+  const config = useMemo(
+    () => ({
+      animation: "immediately" as const,
+      duration: AUTO_ADVANCE_MS,
+      preview: { shouldMount: true as const },
+      timer: { shouldUseDefault: false as const },
+      viewer: { shouldMount: false as const },
+    }),
+    []
+  );
 
   const hasStories = storyItems.length > 0;
-
-  const openViewer = useCallback((index: number) => {
-    setActiveStoryIndex(index);
-    setViewerOpen(true);
-  }, []);
-
-  const closeViewer = useCallback(() => {
-    setViewerOpen(false);
-    setActiveStoryIndex(null);
-  }, []);
-
-  // Auto-advance after 60 seconds
-  useEffect(() => {
-    if (storyTimer) clearTimeout(storyTimer);
-    if (viewerOpen && activeStoryIndex !== null && storyItems.length > 0) {
-      const timer = setTimeout(() => {
-        if (activeStoryIndex < storyItems.length - 1) {
-          setActiveStoryIndex((prev) => (prev !== null ? prev + 1 : 0));
-        } else {
-          setViewerOpen(false);
-          setActiveStoryIndex(null);
-        }
-      }, 60_000);
-      setStoryTimer(timer);
-    }
-    return () => { if (storyTimer) clearTimeout(storyTimer); };
-  }, [viewerOpen, activeStoryIndex, storyItems.length, storyTimer]);
+  const viewerOpen = viewerState.open;
+  // Bounds come from our own data: <ViewerControls /> is also counted as a
+  // child by the library, so its canNext/canPrevious would be off by one.
+  const canNext = viewerOpen && viewerState.index >= 0 && viewerState.index < storyItems.length - 1;
+  const canPrevious = viewerOpen && viewerState.index > 0;
 
   return (
     <div style={{ margin: 0, padding: 0, fontFamily: "system-ui, sans-serif", overflowX: "hidden", minHeight: "100vh", background: "#fff" }}>
@@ -185,16 +312,19 @@ export default function App() {
           <div
             key={item.id}
             data-testid={`story-circle-${idx}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              openViewer(idx);
-            }}
-            onTouchStart={handleTouchStart}
-            onTouchEnd={handleTouchEnd}
-            className={`${styles.storyCircle}${activeStoryIndex === idx ? ` ${styles.active}` : ""}`}
+            onClick={() => openViewer(idx)}
+            className={`${styles.storyCircle}${viewerState.open && viewerState.index === idx ? ` ${styles.active}` : ""}`}
           >
             <img src={`data:image/jpeg;base64,${item.base64}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            <button data-testid={`delete-story-${idx}`} aria-label="Delete story" className={styles.storyCircleDelete} onClick={(e) => { e.stopPropagation(); removeStory(item.id); }}>
+            <button
+              data-testid={`delete-story-${idx}`}
+              aria-label="Delete story"
+              className={styles.storyCircleDelete}
+              onClick={(e) => {
+                e.stopPropagation();
+                removeStory(item.id);
+              }}
+            >
               <DeleteIcon size={14} color="#b91c1c" />
             </button>
           </div>
@@ -208,6 +338,35 @@ export default function App() {
 
       {hasStories ? (
         <>
+          {/* Library owns the full-screen dialog (portal to document.body).
+              Its preview toolbar is hidden via CSS: our own circles above are
+              the visible thumbnails. */}
+          <InstaStories config={config}>
+            <Stories>
+              {storyItems.map((item, idx) => (
+                <Story key={item.id}>
+                  <Preview>
+                    <img src={`data:image/jpeg;base64,${item.base64}`} alt="" />
+                  </Preview>
+                  <Pages>
+                    <Page>
+                      <img src={`data:image/jpeg;base64,${item.base64}`} alt="" />
+                    </Page>
+                  </Pages>
+                </Story>
+              ))}
+              {/* Must stay the last child: story indices are positional. */}
+              <ViewerControls
+                handleRef={handleRef}
+                count={storyItems.length}
+                onSnapshot={handleSnapshot}
+              />
+            </Stories>
+          </InstaStories>
+
+          {/* Transparent control layer above the library dialog:
+              it never blocks the story (pointer-events: none), only the
+              buttons are interactive. */}
           <div
             data-testid="story-viewer-overlay"
             className={`${styles.viewerOverlay}${viewerOpen ? "" : ` ${styles.hidden}`}`}
@@ -215,48 +374,36 @@ export default function App() {
             aria-modal="true"
             aria-label="Story viewer"
           >
-            {/* Close button - top right */}
-            <button data-testid="viewer-close" aria-label="Close viewer" className={styles.viewerClose} onClick={(e) => { e.stopPropagation(); closeViewer(); }}>
+            <div data-testid="story-viewer-container" className={styles.viewerContainer} />
+
+            <button
+              data-testid="viewer-close"
+              aria-label="Close viewer"
+              className={styles.viewerClose}
+              onClick={closeViewer}
+            >
               <CloseIcon size={24} color="#fff" />
             </button>
 
-            {/* Left nav button */}
-            <button data-testid="story-nav-viewer-left" aria-label="Previous story" className={styles.viewerNavButton} onClick={(e) => { e.stopPropagation(); if (activeStoryIndex !== null && activeStoryIndex > 0) setActiveStoryIndex((p) => p! - 1); }} disabled={activeStoryIndex === null || activeStoryIndex === 0}>
+            <button
+              data-testid="story-nav-viewer-left"
+              aria-label="Previous story"
+              className={`${styles.viewerNavButton} ${styles.viewerNavLeft}`}
+              onClick={goPrevious}
+              disabled={!canPrevious}
+            >
               <LeftIcon size={36} color="#fff" />
             </button>
 
-            {/* Right nav button */}
-            <button data-testid="story-nav-viewer-right" aria-label="Next story" className={styles.viewerNavButton} onClick={(e) => { e.stopPropagation(); if (activeStoryIndex !== null && activeStoryIndex < storyItems.length - 1) setActiveStoryIndex((p) => p! + 1); }} disabled={activeStoryIndex === null || activeStoryIndex === storyItems.length - 1}>
+            <button
+              data-testid="story-nav-viewer-right"
+              aria-label="Next story"
+              className={`${styles.viewerNavButton} ${styles.viewerNavRight}`}
+              onClick={goNext}
+              disabled={!canNext}
+            >
               <RightIcon size={36} color="#fff" />
             </button>
-
-            {/* Story viewer - key forces remount when index changes */}
-            <div key={`viewer-${activeStoryIndex}`} data-testid="story-viewer-container" className={styles.viewerContainer} onClick={(e) => e.stopPropagation()} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
-              <InstaStories
-                config={{
-                  animation: "fade",
-                  duration: 3000,
-                  preset: "default",
-                  timer: { shouldUseDefault: true, interval: 3000 },
-                  viewer: { shouldMount: true, story: activeStoryIndex ?? 0 },
-                }}
-              >
-                <Stories>
-                  {storyItems.map((item, idx) => (
-                    <Story key={item.id} duration={3000}>
-                      <Preview>
-                        <img src={`data:image/jpeg;base64,${item.base64}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                      </Preview>
-                      <Pages>
-                        <Page>
-                          <img src={`data:image/jpeg;base64,${item.base64}`} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-                        </Page>
-                      </Pages>
-                    </Story>
-                  ))}
-                </Stories>
-              </InstaStories>
-            </div>
           </div>
         </>
       ) : (
