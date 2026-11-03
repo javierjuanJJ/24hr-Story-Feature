@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Configurable,
   InstaStories,
   Stories,
   Story,
@@ -365,64 +364,60 @@ export default function App() {
               <RightIcon size={36} color="#fff" />
             </button>
 
-            <Configurable.Container>
-              <Configurable.Viewer>
-                <div
-                  data-testid="story-viewer-container"
-                  className={styles.viewerContainer}
-                  onClick={(e) => e.stopPropagation()}
-                  onTouchStart={handleTouchStart}
-                  onTouchEnd={handleTouchEnd}
-                >
-                  <InstaStories
-                    config={{
-                      animation: "fade",
-                      duration: 3000,
-                      preset: "default",
-                      timer: {
-                        shouldUseDefault: true,
-                        interval: 3000,
-                      },
-                      viewer: {
-                        shouldMount: true,
-                        story: activeStoryIndex ?? 0,
-                      },
-                    }}
-                  >
-                    <Stories>
-                      {storyItems.map((item, idx) => (
-                        <Story key={item.id} duration={3000}>
-                          <Preview>
-                            <img
-                              src={`data:image/jpeg;base64,${item.base64}`}
-                              alt=""
-                              style={{
-                                width: "100%",
-                                height: "100%",
-                                objectFit: "cover",
-                              }}
-                            />
-                          </Preview>
-                          <Pages>
-                            <Page>
-                              <img
-                                src={`data:image/jpeg;base64,${item.base64}`}
-                                alt=""
-                                style={{
-                                  width: "100%",
-                                  height: "100%",
-                                  objectFit: "contain",
-                                }}
-                              />
-                            </Page>
-                          </Pages>
-                        </Story>
-                      ))}
-                    </Stories>
-                  </InstaStories>
-                </div>
-              </Configurable.Viewer>
-            </Configurable.Container>
+            <div
+              data-testid="story-viewer-container"
+              className={styles.viewerContainer}
+              onClick={(e) => e.stopPropagation()}
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
+            >
+              <InstaStories
+                config={{
+                  animation: "fade",
+                  duration: 3000,
+                  preset: "default",
+                  timer: {
+                    shouldUseDefault: true,
+                    interval: 3000,
+                  },
+                  viewer: {
+                    shouldMount: true,
+                    story: activeStoryIndex ?? 0,
+                  },
+                }}
+              >
+                <Stories>
+                  {storyItems.map((item, idx) => (
+                    <Story key={item.id} duration={3000}>
+                      <Preview>
+                        <img
+                          src={`data:image/jpeg;base64,${item.base64}`}
+                          alt=""
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                          }}
+                        />
+                      </Preview>
+                      <Pages>
+                        <Page>
+                          <img
+                            src={`data:image/jpeg;base64,${item.base64}`}
+                            alt=""
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              objectFit: "contain",
+                            }}
+                          />
+                        </Page>
+                      </Pages>
+                    </Story>
+                  ))}
+                </Stories>
+              </InstaStories>
+            </div>
           </div>
         </>
       ) : (
