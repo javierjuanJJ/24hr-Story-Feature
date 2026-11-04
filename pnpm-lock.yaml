@@ -169,6 +169,9 @@ importers:
       '@react-instastories/base':
         specifier: ^1.0.7
         version: 1.0.7(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      '@react-instastories/external':
+        specifier: ^1.0.7
+        version: 1.0.7(@react-instastories/base@1.0.7(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       vite:
         specifier: ^8.3.5
         version: 8.3.5
@@ -212,6 +215,14 @@ packages:
     resolution: {integrity: sha512-TQLjdFJaKfQr9d29zzS7QziVijOmaVm9qggskdGHE0ZAhhJPx74movE5LU+VA+h4pIZTgWtSVvzJYoKOkSMgTg==}
     engines: {node: '>=18.18.0 || ^20.9.0 || >=21.1.0', yarn: '>=3'}
     peerDependencies:
+      react: ^16.14.0 || ^17 || ^18 || ^19
+      react-dom: ^16.14.0 || ^17 || ^18 || ^19
+
+  '@react-instastories/external@1.0.7':
+    resolution: {integrity: sha512-bfQCAvgxCj7z8GHaMLDquMdLAnymFBxhSTyqEpBS9tlw7lY0ZBVoyUIFZ1V38173xuyX088VfHKb1Rtv1VW/QQ==}
+    engines: {node: '>=18.18.0 || ^20.9.0 || >=21.1.0', yarn: '>=3'}
+    peerDependencies:
+      '@react-instastories/base': ^1.0.6
       react: ^16.14.0 || ^17 || ^18 || ^19
       react-dom: ^16.14.0 || ^17 || ^18 || ^19
 
@@ -662,6 +673,12 @@ snapshots:
 
   '@react-instastories/base@1.0.7(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
     dependencies:
+      react: 19.3.1
+      react-dom: 19.3.1(react@19.3.1)
+
+  '@react-instastories/external@1.0.7(@react-instastories/base@1.0.7(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
+    dependencies:
+      '@react-instastories/base': 1.0.7(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react: 19.3.1
       react-dom: 19.3.1(react@19.3.1)
 

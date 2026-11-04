@@ -8,8 +8,10 @@ import {
   Preview,
   useStoriesContext,
   useViewerContext,
+  useTimerContext,
 } from "@react-instastories/base";
 import "@react-instastories/base/index.css";
+import { Controls } from "@react-instastories/external";
 import styles from "./App.module.css";
 import {
   CloseIcon,
@@ -114,18 +116,27 @@ function ViewerControls({
     actionRef.current = { current, next: stories.next, close: viewer.close };
   });
 
-  // 60s per story: advance to the next one, or close back to the main screen.
-  useEffect(() => {
-    if (!mounted || current < 0) return;
-    const timer = window.setTimeout(() => {
-      const action = actionRef.current;
-      if (action.current >= 0 && action.current < count - 1) action.next();
-      else action.close();
-    }, AUTO_ADVANCE_MS);
-    return () => window.clearTimeout(timer);
-  }, [mounted, current, count]);
-
+  // The library's native timer (timer.shouldUseDefault: true) now drives the
+  // per-story duration and auto-advance; the progress bar (Controls.Indicator)
+  // reflects it. Kept actionRef for the imperative handle only.
   return null;
+}
+
+/** Native progress bar: fills with the story timer. When the timer expires,
+ *  the library auto-advances to the next story (or closes the viewer when no
+ *  stories remain), so the user returns to the main screen.
+ */
+function StoryProgressBar() {
+  const timer = useTimerContext();
+  // Always visible while a story is displayed; progress driven by timer.time.
+  const progress = timer.duration > 0 ? Math.min(100, (timer.time / timer.duration) * 100) : 0;
+  return (
+    <div className={styles.progressBarWrap}>
+      <div className={styles.progressBar}>
+        <div className={styles.progressFill} style={{ width: `${progress}%` }} />
+      </div>
+    </div>
+  );
 }
 
 export default function App() {
@@ -202,6 +213,14 @@ export default function App() {
   const closeViewer = useCallback(() => {
     handleRef.current?.close();
   }, []);
+
+  // When the native timer runs out of stories (index === -1), close the viewer
+  // and return to the main screen.
+  useEffect(() => {
+    if (viewerState.open && viewerState.index === -1) {
+      closeViewer();
+    }
+  }, [viewerState.open, viewerState.index, closeViewer]);
 
   const removeStory = (id: string) => {
     if (viewerState.open) closeViewer();
@@ -291,7 +310,7 @@ export default function App() {
       animation: "immediately" as const,
       duration: AUTO_ADVANCE_MS,
       preview: { shouldMount: true as const },
-      timer: { shouldUseDefault: false as const },
+      timer: { shouldUseDefault: true as const },
       viewer: { shouldMount: false as const },
     }),
     []
@@ -353,6 +372,12 @@ export default function App() {
                       <img src={`data:image/jpeg;base64,${item.base64}`} alt="" />
                     </Page>
                   </Pages>
+                  {/* Native page navigation (next/previous page within a story). */}
+                  <Controls.Pages.Next />
+                  <Controls.Pages.Previous />
+                  {/* Progress bar that fills with the story timer; when the timer
+                      expires the library auto-advances to the next story. */}
+                  <StoryProgressBar />
                 </Story>
               ))}
               {/* Must stay the last child: story indices are positional. */}

@@ -205,6 +205,34 @@
   background: rgba(255, 255, 255, 0.15);
 }
 
+/* Story progress bar (fills with the native story timer). */
+.progressBarWrap {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 5;
+  pointer-events: none;
+  overflow: hidden;
+}
+.progressBar {
+  height: 100%;
+  background: rgba(255, 255, 255, 0.35);
+}
+.progressFill {
+  height: 100%;
+  background: #fff;
+  width: 0%;
+  transition: width 0.1s linear;
+}
+
+/* Ensure the story container is a positioning context so the progress bar
+   stays pinned inside each story. */
+:global(.instastories-story) {
+  position: relative;
+}
+
 /* Responsive: tablet/mobile */
 @media (max-width: 640px) {
   .storyList {
