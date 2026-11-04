@@ -90,6 +90,7 @@ function ViewerControls({
 }) {
   const stories = useStoriesContext();
   const viewer = useViewerContext();
+  const timer = useTimerContext();
 
   const mounted = viewer.mounted;
   const current = stories.current;
@@ -110,15 +111,23 @@ function ViewerControls({
     onSnapshot({ open: mounted, index: current });
   }, [mounted, current, onSnapshot]);
 
-  // Latest values for the auto-advance timer (avoids restarting it on renders).
-  const actionRef = useRef({ current, next: stories.next, close: viewer.close });
+  // Start the native timer when the viewer opens and stop it when it closes.
+  // The library only advances to the next story once the timer expires.
   useEffect(() => {
-    actionRef.current = { current, next: stories.next, close: viewer.close };
-  });
+    if (mounted) {
+      timer.reset();
+      timer.start();
+    } else {
+      timer.stop();
+    }
+  }, [mounted, timer]);
 
-  // The library's native timer (timer.shouldUseDefault: true) now drives the
-  // per-story duration and auto-advance; the progress bar (Controls.Indicator)
-  // reflects it. Kept actionRef for the imperative handle only.
+  // Reset the timer when moving to a different story so each story gets its
+  // own full duration and its own progress bar starting at 0%.
+  useEffect(() => {
+    if (mounted) timer.reset();
+  }, [mounted, current, timer]);
+
   return null;
 }
 
