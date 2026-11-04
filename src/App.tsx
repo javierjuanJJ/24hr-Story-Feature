@@ -131,19 +131,22 @@ function ViewerControls({
   return null;
 }
 
-/** Native progress bar: fills with the story timer. When the timer expires,
- *  the library auto-advances to the next story (or closes the viewer when no
- *  stories remain), so the user returns to the main screen.
+/** Native progress bar: fills with the story timer and shows seconds left.
+ *  When the timer expires, the library auto-advances to the next story (or
+ *  closes the viewer when no stories remain), returning to the main screen.
  */
 function StoryProgressBar() {
   const timer = useTimerContext();
-  // Always visible while a story is displayed; progress driven by timer.time.
+  const secondsLeft = timer.duration > 0
+    ? Math.max(0, Math.ceil((timer.duration - timer.time) / 1000))
+    : 0;
   const progress = timer.duration > 0 ? Math.min(100, (timer.time / timer.duration) * 100) : 0;
   return (
     <div className={styles.progressBarWrap}>
       <div className={styles.progressBar}>
         <div className={styles.progressFill} style={{ width: `${progress}%` }} />
       </div>
+      <span className={styles.progressTimer}>{secondsLeft}s</span>
     </div>
   );
 }

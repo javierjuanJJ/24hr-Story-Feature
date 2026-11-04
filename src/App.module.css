@@ -211,22 +211,55 @@
   top: 0;
   left: 0;
   right: 0;
-  height: 4px;
   z-index: 60;
   pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding: 8px 12px;
+  box-sizing: border-box;
+}
+
+/* Track behind the fill */
+.progressTrack {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  z-index: 1;
+  pointer-events: none;
   overflow: hidden;
-  background: rgba(0, 0, 0, 0.25);
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 2px;
 }
 .progressBar {
   height: 100%;
-  background: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.35);
 }
 .progressFill {
   height: 100%;
   background: #fff;
   width: 0%;
   transition: width 0.05s linear;
-  box-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
+  border-radius: 2px;
+}
+
+/* Seconds-left label above the bar */
+.progressTimer {
+  position: relative;
+  z-index: 2;
+  margin-bottom: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 0 6px rgba(0, 0, 0, 0.8);
+  background: rgba(0, 0, 0, 0.45);
+  padding: 1px 6px;
+  border-radius: 10px;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 /* Ensure the story container is a positioning context so the progress bar
