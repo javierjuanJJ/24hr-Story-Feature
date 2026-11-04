@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   InstaStories,
   Stories,
@@ -8,7 +8,6 @@ import {
   Preview,
   useStoriesContext,
   useViewerContext,
-  useTimerContext,
 } from "@react-instastories/base";
 import "@react-instastories/base/index.css";
 import { Controls } from "@react-instastories/external";
@@ -42,12 +41,24 @@ interface ViewerSnapshot {
   index: number;
 }
 
+/** Simple context to share story progress from <ViewerControls /> (inside
+ *  Instastories, where useStoriesContext works) to the overlay timeline. */
+const AppTimerProgressContext =
+  createContext<TimerProgressValue | null>(null);
+
 const STORAGE_KEY = "@@storyImages";
 const MAX_WIDTH = 1080;
 const MAX_HEIGHT = 1920;
 const EXPIRY_MS = 86_400_000; // 24 hours
 const MAX_STORIES = 20;
 const AUTO_ADVANCE_MS = 60_000; // 60 seconds per story
+
+interface TimerProgressValue {
+  time: number;
+  duration: number;
+  current: number;
+  length: number;
+}
 
 function generateId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -83,17 +94,19 @@ function ViewerControls({
   handleRef,
   count,
   onSnapshot,
+  setTimerProgress,
 }: {
   handleRef: React.RefObject<ViewerControlsHandle | null>;
   count: number;
   onSnapshot: (snapshot: ViewerSnapshot) => void;
+  setTimerProgress: (v: TimerProgressValue) => void;
 }) {
   const stories = useStoriesContext();
   const viewer = useViewerContext();
-  const timer = useTimerContext();
 
   const mounted = viewer.mounted;
   const current = stories.current;
+  const length = stories.length;
 
   // Refresh the imperative handle after every render so <App /> always calls
   // the latest context functions.
@@ -111,42 +124,92 @@ function ViewerControls({
     onSnapshot({ open: mounted, index: current });
   }, [mounted, current, onSnapshot]);
 
-  // Start the native timer when the viewer opens and stop it when it closes.
-  // The library only advances to the next story once the timer expires.
-  useEffect(() => {
-    if (mounted) {
-      timer.reset();
-      timer.start();
-    } else {
-      timer.stop();
-    }
-  }, [mounted, timer]);
+  // Own timer so the progress bar works reliably. duration comes from the
+  // library config (AUTO_ADVANCE_MS), time advances every 100 ms while the
+  // viewer is open and a story is active.
+  const duration = AUTO_ADVANCE_MS;
+  const timeRef = useRef(0);
 
-  // Reset the timer when moving to a different story so each story gets its
-  // own full duration and its own progress bar starting at 0%.
   useEffect(() => {
-    if (mounted) timer.reset();
-  }, [mounted, current, timer]);
+    if (!mounted || current < 0) {
+      timeRef.current = 0;
+      setTimerProgress({ time: 0, duration, current: -1, length });
+      return;
+    }
+    timeRef.current = 0;
+    setTimerProgress({ time: 0, duration, current, length });
+    const id = window.setInterval(() => {
+      timeRef.current = Math.min(timeRef.current + 100, duration);
+      setTimerProgress({ time: timeRef.current, duration, current, length });
+    }, 100);
+    return () => window.clearInterval(id);
+  }, [mounted, current, duration, length, setTimerProgress]);
 
   return null;
 }
 
-/** Native progress bar: fills with the story timer and shows seconds left.
- *  When the timer expires, the library auto-advances to the next story (or
- *  closes the viewer when no stories remain), returning to the main screen.
- */
-function StoryProgressBar() {
-  const timer = useTimerContext();
-  const secondsLeft = timer.duration > 0
-    ? Math.max(0, Math.ceil((timer.duration - timer.time) / 1000))
+/** Instagram-style story progress timeline: one segment per story at the top
+ *  of the viewer. Completed segments are full, the current segment fills
+ *  progressively, future segments are empty. Shows how much time is left
+ *  before advancing to the next story. */
+function StoryTimeline({
+  storyItems,
+  currentIndex,
+  onClose,
+}: {
+  storyItems: StoryItem[];
+  currentIndex: number;
+  onClose: () => void;
+}) {
+  const progress = useContext(AppTimerProgressContext);
+  const now = Date.now();
+
+  if (!progress || currentIndex < 0 || currentIndex >= storyItems.length) {
+    return null;
+  }
+
+  const { time, duration } = progress;
+  const currentProgress = duration > 0 ? Math.min(100, (time / duration) * 100) : 0;
+  const item = storyItems[currentIndex];
+  const ageHours = item
+    ? Math.max(0, Math.floor((now - item.timestamp) / 3_600_000))
     : 0;
-  const progress = timer.duration > 0 ? Math.min(100, (timer.time / timer.duration) * 100) : 0;
+  const secondsLeft = duration > 0 ? Math.max(0, Math.ceil((duration - time) / 1000)) : 0;
+
   return (
-    <div className={styles.progressBarWrap}>
-      <div className={styles.progressBar}>
-        <div className={styles.progressFill} style={{ width: `${progress}%` }} />
+    <div className={styles.storyTimeline}>
+      <div className={styles.storyTimelineHeader}>
+        <div className={styles.storyTimelineUser}>
+          <span className={styles.storyTimelineUserName}>usuario</span>
+          <span className={styles.storyTimelineTime}>{ageHours}h</span>
+        </div>
+        <span className={styles.storyTimelineSeconds}>{secondsLeft}s</span>
+        <button
+          data-testid="viewer-close-timeline"
+          aria-label="Close viewer"
+          className={styles.storyTimelineClose}
+          onClick={onClose}
+        >
+          <CloseIcon size={20} color="#fff" />
+        </button>
       </div>
-      <span className={styles.progressTimer}>{secondsLeft}s</span>
+      <div className={styles.storyTimelineBar}>
+        {storyItems.map((_, i) => (
+          <div key={i} className={styles.storyTimelineSegment}>
+            <div
+              className={styles.storyTimelineFill}
+              style={{
+                width:
+                  i < currentIndex
+                    ? "100%"
+                    : i === currentIndex
+                    ? `${currentProgress}%`
+                    : "0%",
+              }}
+            />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -169,6 +232,13 @@ export default function App() {
   const [viewerState, setViewerState] = useState<ViewerSnapshot>({
     open: false,
     index: -1,
+  });
+
+  const [timerProgress, setTimerProgress] = useState<TimerProgressValue>({
+    time: 0,
+    duration: AUTO_ADVANCE_MS,
+    current: -1,
+    length: 0,
   });
 
   const handleSnapshot = useCallback((snapshot: ViewerSnapshot) => {
@@ -368,81 +438,87 @@ export default function App() {
       <input type="file" accept="image/*" ref={fileRef} style={{ display: "none" }} onChange={handleUpload} />
 
       {hasStories ? (
-        <>
-          {/* Library owns the full-screen dialog (portal to document.body).
-              Its preview toolbar is hidden via CSS: our own circles above are
-              the visible thumbnails. */}
-          <InstaStories config={config}>
-            <Stories>
-              {storyItems.map((item, idx) => (
-                <Story key={item.id}>
-                  <Preview>
-                    <img src={`data:image/jpeg;base64,${item.base64}`} alt="" />
-                  </Preview>
-                  <Pages>
-                    <Page>
+        <AppTimerProgressContext.Provider value={timerProgress}>
+          <>
+            {/* Library owns the full-screen dialog (portal to document.body).
+                Its preview toolbar is hidden via CSS: our own circles above are
+                the visible thumbnails. */}
+            <InstaStories config={config}>
+              <Stories>
+                {storyItems.map((item, idx) => (
+                  <Story key={item.id}>
+                    <Preview>
                       <img src={`data:image/jpeg;base64,${item.base64}`} alt="" />
-                    </Page>
-                  </Pages>
-                  {/* Native page navigation (next/previous page within a story). */}
-                  <Controls.Pages.Next />
-                  <Controls.Pages.Previous />
-                  {/* Progress bar that fills with the story timer; when the timer
-                      expires the library auto-advances to the next story. */}
-                  <StoryProgressBar />
-                </Story>
-              ))}
-              {/* Must stay the last child: story indices are positional. */}
-              <ViewerControls
-                handleRef={handleRef}
-                count={storyItems.length}
-                onSnapshot={handleSnapshot}
-              />
-            </Stories>
-          </InstaStories>
+                    </Preview>
+                    <Pages>
+                      <Page>
+                        <img src={`data:image/jpeg;base64,${item.base64}`} alt="" />
+                      </Page>
+                    </Pages>
+                  </Story>
+                ))}
+                {/* Must stay the last child: story indices are positional. */}
+                <ViewerControls
+                  handleRef={handleRef}
+                  count={storyItems.length}
+                  onSnapshot={handleSnapshot}
+                  setTimerProgress={setTimerProgress}
+                />
+              </Stories>
+            </InstaStories>
 
-          {/* Transparent control layer above the library dialog:
-              it never blocks the story (pointer-events: none), only the
-              buttons are interactive. */}
-          <div
-            data-testid="story-viewer-overlay"
-            className={`${styles.viewerOverlay}${viewerOpen ? "" : ` ${styles.hidden}`}`}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Story viewer"
-          >
-            <div data-testid="story-viewer-container" className={styles.viewerContainer} />
-
-            <button
-              data-testid="viewer-close"
-              aria-label="Close viewer"
-              className={styles.viewerClose}
-              onClick={closeViewer}
+            {/* Transparent control layer above the library dialog:
+                it never blocks the story (pointer-events: none), only the
+                buttons are interactive. */}
+            <div
+              data-testid="story-viewer-overlay"
+              className={`${styles.viewerOverlay}${viewerOpen ? "" : ` ${styles.hidden}`}`}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Story viewer"
             >
-              <CloseIcon size={24} color="#fff" />
-            </button>
+              <div data-testid="story-viewer-container" className={styles.viewerContainer} />
 
-            <button
-              data-testid="story-nav-viewer-left"
-              aria-label="Previous story"
-              className={`${styles.viewerNavButton} ${styles.viewerNavLeft}`}
-              onClick={goPrevious}
-              disabled={!canPrevious}
-            >
-              <LeftIcon size={36} color="#fff" />
-            </button>
+              <button
+                data-testid="viewer-close"
+                aria-label="Close viewer"
+                className={styles.viewerClose}
+                onClick={closeViewer}
+              >
+                <CloseIcon size={24} color="#fff" />
+              </button>
 
-            <button
-              data-testid="story-nav-viewer-right"
-              aria-label="Next story"
-              className={`${styles.viewerNavButton} ${styles.viewerNavRight}`}
-              onClick={goNext}
-              disabled={!canNext}
-            >
-              <RightIcon size={36} color="#fff" />
-            </button>
-          </div>
-        </>
+              <button
+                data-testid="story-nav-viewer-left"
+                aria-label="Previous story"
+                className={`${styles.viewerNavButton} ${styles.viewerNavLeft}`}
+                onClick={goPrevious}
+                disabled={!canPrevious}
+              >
+                <LeftIcon size={36} color="#fff" />
+              </button>
+
+              <button
+                data-testid="story-nav-viewer-right"
+                aria-label="Next story"
+                className={`${styles.viewerNavButton} ${styles.viewerNavRight}`}
+                onClick={goNext}
+                disabled={!canNext}
+              >
+                <RightIcon size={36} color="#fff" />
+              </button>
+
+              {/* Instagram-style progress timeline at the top of the viewer. */}
+              {timerProgress.current >= 0 && (
+                <StoryTimeline
+                  storyItems={storyItems}
+                  currentIndex={timerProgress.current}
+                  onClose={closeViewer}
+                />
+              )}
+            </div>
+          </>
+        </AppTimerProgressContext.Provider>
       ) : (
         <p data-testid="empty-state" className={styles.emptyState}>No stories yet. Upload an image to get started.</p>
       )}

@@ -205,61 +205,85 @@
   background: rgba(255, 255, 255, 0.15);
 }
 
-/* Story progress bar (fills with the native story timer). */
-.progressBarWrap {
-  position: absolute;
+/* Instagram-style story progress timeline at the top of the viewer. */
+.storyTimeline {
+  position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  z-index: 60;
-  pointer-events: none;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  padding: 8px 12px;
-  box-sizing: border-box;
+  z-index: 80;
+  pointer-events: auto;
+  color: #fff;
 }
 
-/* Track behind the fill */
-.progressTrack {
+.storyTimelineHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px 6px;
+  text-shadow: 0 0 6px rgba(0, 0, 0, 0.8);
+}
+
+.storyTimelineUser {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.storyTimelineUserName {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.storyTimelineTime {
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.storyTimelineClose {
+  background: rgba(0, 0, 0, 0.5);
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #fff;
+}
+
+.storyTimelineClose:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.storyTimelineBar {
+  display: flex;
+  height: 3px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 0 16px;
+  gap: 2px;
+}
+
+.storyTimelineSegment {
+  flex: 1;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.3);
+  position: relative;
+  overflow: hidden;
+  border-radius: 2px;
+}
+
+.storyTimelineFill {
   position: absolute;
   top: 0;
   left: 0;
-  right: 0;
-  height: 4px;
-  z-index: 1;
-  pointer-events: none;
-  overflow: hidden;
-  background: rgba(0, 0, 0, 0.35);
-  border-radius: 2px;
-}
-.progressBar {
-  height: 100%;
-  background: rgba(255, 255, 255, 0.35);
-}
-.progressFill {
   height: 100%;
   background: #fff;
   width: 0%;
-  transition: width 0.05s linear;
-  box-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
+  transition: width 0.1s linear;
   border-radius: 2px;
-}
-
-/* Seconds-left label above the bar */
-.progressTimer {
-  position: relative;
-  z-index: 2;
-  margin-bottom: 4px;
-  font-size: 11px;
-  font-weight: 700;
-  color: #fff;
-  text-shadow: 0 0 6px rgba(0, 0, 0, 0.8);
-  background: rgba(0, 0, 0, 0.45);
-  padding: 1px 6px;
-  border-radius: 10px;
-  white-space: nowrap;
-  pointer-events: none;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.7);
 }
 
 /* Ensure the story container is a positioning context so the progress bar
