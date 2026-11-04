@@ -212,7 +212,7 @@
   left: 0;
   right: 0;
   z-index: 80;
-  pointer-events: auto;
+  pointer-events: none;
   color: #fff;
 }
 
@@ -222,6 +222,7 @@
   align-items: center;
   padding: 10px 16px 6px;
   text-shadow: 0 0 6px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
 }
 
 .storyTimelineUser {
@@ -251,6 +252,7 @@
   justify-content: center;
   cursor: pointer;
   color: #fff;
+  pointer-events: auto;
 }
 
 .storyTimelineClose:hover {
