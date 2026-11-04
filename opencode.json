@@ -16,5 +16,11 @@
                 "@playwright/mcp@latest"
             ]
         }
+    },
+    "commands": {
+        "organize-react-project": {
+            "description": "Organize any React project into feature-based folders (consts, components, hooks, utils, interfaces) with barrel exports and English comments, preserving all existing functionality.",
+            "template": "Lee y ejecuta todos los pasos definidos en el archivo .opencode/commands/organize-react-project.md: explora la estructura del proyecto React; crea las carpetas consts, components, hooks, utils e interfaces bajo src/; extrae constantes, interfaces, utilidades, hooks y componentes a sus respectivas carpetas con responsabilidades separadas; agrega barrel exports (index.ts) en cada carpeta; actualiza los imports y el path alias @/* para que apunte a ./src/*; actualiza el entry point (main.tsx/index.tsx) para importar desde ./components/App; elimina archivos duplicados (src/App.tsx si corresponde); verifica con tsc --noEmit y el comando de build del proyecto que no se pierda funcionalidad. Todo el código debe tener comentarios en inglés para que un programador junior entienda los cambios. El comando es genérico y funciona en cualquier proyecto React + TypeScript, no solo en este."
+        }
     }
 }
